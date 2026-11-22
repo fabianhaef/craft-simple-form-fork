@@ -74,6 +74,9 @@ use craft\web\Response;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
 use craft\web\View;
+use CraftCms\Cms\Mcp\CapabilityRegistry;
+use CraftCms\Cms\Mcp\Events\CollectingAdminInstructions as NativeCollectingAdminInstructions;
+use Illuminate\Support\Facades\Event as LaravelEvent;
 use yii\base\Event;
 
 /**
@@ -850,6 +853,27 @@ class Plugin extends BasePlugin
      */
     private function registerCraftMcp(): void
     {
+        // Craft 6 replaced the whole registration mechanism, not just the
+        // namespace: craft\services\Mcp doesn't exist at all (class_exists()
+        // on it is false, not a fatal — it just means this guard needs
+        // checking first), and a plugin registers its tool types by calling
+        // register(...$types) on a container-resolved singleton instead of
+        // listening for an event. The admin-instructions hook kept the same
+        // shape but also switched mechanism: it's a real Laravel event now,
+        // dispatched through the global event() helper, not a Yii one.
+        if (class_exists(CapabilityRegistry::class)) {
+            app(CapabilityRegistry::class)->register(\anvildev\simpleform\mcp\CraftTools::class);
+
+            LaravelEvent::listen(
+                NativeCollectingAdminInstructions::class,
+                static function(NativeCollectingAdminInstructions $event): void {
+                    $event->instructions[] = 'Use the simple_form_* tools to list and edit forms and to read submissions. Deletes require confirm=true. The plugin’s own MCP token endpoint is separate.';
+                },
+            );
+
+            return;
+        }
+
         if (!class_exists(\craft\services\Mcp::class)) {
             return;
         }

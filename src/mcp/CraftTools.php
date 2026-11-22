@@ -22,6 +22,7 @@ use anvildev\simpleform\mcp\tools\ToolInterface;
 use anvildev\simpleform\mcp\tools\UpdateFieldTool;
 use anvildev\simpleform\mcp\tools\UpdateFormTool;
 use craft\mcp\attributes\RequiresPermission;
+use CraftCms\Cms\Mcp\Attributes\RequiresPermission as NativeRequiresPermission;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Schema\ToolAnnotations;
 
@@ -38,6 +39,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_list_forms', description: 'List Simple Form forms (id, handle, name, field count). No submission data.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function listForms(): array
     {
         return $this->run(new ListFormsTool(), []);
@@ -48,6 +50,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_get_form', description: 'Get one form and its fields by id or handle. No submission data.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function getForm(?int $id = null, ?string $handle = null): array
     {
         return $this->run(new GetFormTool(), ['id' => $id, 'handle' => $handle]);
@@ -58,6 +61,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_create_form', description: 'Create a form through the same save path as the control panel.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function createForm(string $name, string $handle, ?string $title = null, ?string $description = null, ?string $emailTo = null, ?string $emailSubject = null, ?string $emailBody = null, ?string $emailReplyTo = null, ?int $siteId = null, ?string $propagationMethod = null): array
     {
         return $this->run(new CreateFormTool(), [
@@ -79,6 +83,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_update_form', description: 'Update a form. Only the supplied fields change.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function updateForm(?int $id = null, ?string $handle = null, ?string $name = null, ?string $newHandle = null, ?string $title = null, ?string $description = null, ?string $emailTo = null, ?string $emailSubject = null, ?string $emailBody = null, ?string $emailReplyTo = null, ?int $siteId = null, ?string $propagationMethod = null): array
     {
         return $this->run(new UpdateFormTool(), [
@@ -102,6 +107,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_delete_form', description: 'Delete a form and its fields. Refused unless confirm is true.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function deleteForm(?int $id = null, ?string $handle = null, ?bool $confirm = null): array
     {
         return $this->run(new DeleteFormTool(), ['id' => $id, 'handle' => $handle, 'confirm' => $confirm]);
@@ -113,6 +119,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_add_field', description: 'Add a field to a form. Same validation as the control panel.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function addField(int $formId, string $type, string $handle, string $label, ?bool $required = null, ?string $helpText = null, ?array $config = null): array
     {
         return $this->run(new AddFieldTool(), [
@@ -132,6 +139,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_update_field', description: 'Update one field. Only the supplied values change.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function updateField(int $fieldId, ?string $handle = null, ?string $label = null, ?bool $required = null, ?string $helpText = null, ?array $config = null, ?int $siteId = null): array
     {
         return $this->run(new UpdateFieldTool(), [
@@ -151,6 +159,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_reorder_fields', description: 'Reorder a form’s fields. fieldIds is the complete new order.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function reorderFields(int $formId, array $fieldIds): array
     {
         return $this->run(new ReorderFieldsTool(), ['formId' => $formId, 'fieldIds' => $fieldIds]);
@@ -161,6 +170,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_delete_field', description: 'Delete one field. Refused unless confirm is true.', annotations: new ToolAnnotations(destructiveHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function deleteField(int $fieldId, ?bool $confirm = null): array
     {
         return $this->run(new DeleteFieldTool(), ['fieldId' => $fieldId, 'confirm' => $confirm]);
@@ -171,6 +181,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_list_integrations', description: 'List a form’s integrations and recent delivery status. No secrets.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_FORMS)]
     public function listIntegrations(?int $id = null, ?string $handle = null): array
     {
         return $this->run(new ListIntegrationsTool(), ['id' => $id, 'handle' => $handle]);
@@ -182,6 +193,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_query_submissions', description: 'Query submissions, including stored answers.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
     public function querySubmissions(?string $form = null, ?int $formId = null, ?string $status = null, ?string $dateFrom = null, ?string $dateTo = null, ?array $fieldMatch = null, ?int $offset = null, ?int $limit = null): array
     {
         return $this->run(new QuerySubmissionsTool(), [
@@ -201,6 +213,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_get_submission', description: 'Get one submission, including its stored answers.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
     public function getSubmission(int $id): array
     {
         return $this->run(new GetSubmissionTool(), ['id' => $id]);
@@ -212,6 +225,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_export_submissions', description: 'Export matching submissions. Requires permission to manage submissions.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::MANAGE_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::MANAGE_SUBMISSIONS)]
     public function exportSubmissions(?string $form = null, ?int $formId = null, ?string $status = null, ?string $dateFrom = null, ?string $dateTo = null, ?array $fieldMatch = null, ?string $format = null): array
     {
         return $this->run(new ExportSubmissionsTool(), [
@@ -230,6 +244,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_submission_stats', description: 'Count submissions by status, form, and time.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
     public function submissionStats(?string $form = null, ?int $formId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         return $this->run(new SubmissionStatsTool(), [
@@ -246,6 +261,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_summarize_submissions', description: 'Return the free-text corpus of matching submissions.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
     public function summarizeSubmissions(?string $form = null, ?int $formId = null, ?string $dateFrom = null, ?string $dateTo = null, ?array $fields = null): array
     {
         return $this->run(new SummarizeSubmissionsTool(), [
@@ -262,6 +278,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_categorize_submissions', description: 'Group matching submissions by a field or status.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
     public function categorizeSubmissions(?string $form = null, ?int $formId = null, ?string $dateFrom = null, ?string $dateTo = null, ?string $groupBy = null): array
     {
         return $this->run(new CategorizeSubmissionsTool(), [
@@ -278,6 +295,7 @@ class CraftTools
      */
     #[McpTool(name: 'simple_form_detect_spam_patterns', description: 'Flag likely-spam submissions with explainable heuristics.', annotations: new ToolAnnotations(readOnlyHint: true))]
     #[RequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
+    #[NativeRequiresPermission(SimpleFormPermissions::VIEW_SUBMISSIONS)]
     public function detectSpamPatterns(?string $form = null, ?int $formId = null, ?string $dateFrom = null, ?string $dateTo = null, ?int $linkThreshold = null): array
     {
         return $this->run(new DetectSpamPatternsTool(), [
