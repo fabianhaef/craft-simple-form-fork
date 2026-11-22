@@ -4,6 +4,7 @@ namespace anvildev\simpleform\gql\types;
 
 use craft\gql\base\ObjectType;
 use craft\gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\Contracts\SingularTypeInterface;
 use GraphQL\Type\Definition\ObjectType as GraphQLObjectType;
 
 /**
@@ -16,7 +17,7 @@ use GraphQL\Type\Definition\ObjectType as GraphQLObjectType;
  * @phpstan-type GqlFieldDefinition array{type: \GraphQL\Type\Definition\Type, description?: string, resolve?: callable, args?: array<string, mixed>}
  * @phpstan-type GqlFieldDefinitionMap array<string, GqlFieldDefinition>
  */
-abstract class SimpleFormObjectType extends ObjectType
+abstract class SimpleFormObjectType extends ObjectType implements SingularTypeInterface
 {
     abstract public static function getName(): string;
 
