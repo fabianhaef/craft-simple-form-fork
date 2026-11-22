@@ -16,6 +16,15 @@ use craft\helpers\Db;
  */
 class SubmissionQuery extends ElementQuery
 {
+    /**
+     * Declaring this real class-level property (not assigning it at
+     * runtime) is what makes Craft 6 auto-join this table — it replaces
+     * joinElementTable(), which beforePrepare() below still calls for
+     * Craft 5. Craft 5's own ElementQuery has no such property, so this
+     * is just an unused extra property there.
+     */
+    protected string $table = 'simpleform_submissions';
+
     public ?int $formId = null;
     public ?string $readStatus = null;
     public mixed $workflowStatus = null;
@@ -163,5 +172,66 @@ class SubmissionQuery extends ElementQuery
         }
 
         return parent::beforePrepare();
+    }
+
+    /**
+     * Craft 6 never calls beforePrepare() at all — this is the real hook
+     * there. Translates the same select/filters above to the new
+     * Illuminate\Database\Query\Builder ($this->query is no longer split
+     * into query/subQuery, and has no andWhere()/joinElementTable()).
+     */
+    protected function elementQueryBeforeQuery(): void
+    {
+        parent::elementQueryBeforeQuery();
+
+        $this->query->addSelect([
+            'simpleform_submissions.formId',
+            'simpleform_submissions.data',
+            'simpleform_submissions.fieldSnapshot',
+            'simpleform_submissions.userId',
+            'simpleform_submissions.readStatus',
+            'simpleform_submissions.workflowStatus',
+            'simpleform_submissions.spamReason',
+            'simpleform_submissions.sourceIp',
+            'simpleform_submissions.ipHash',
+            'simpleform_submissions.dedupeHash',
+            'simpleform_submissions.guestEmailHash',
+            'simpleform_submissions.paymentStatus',
+            'simpleform_submissions.paymentAmount',
+            'simpleform_submissions.orderId',
+            'simpleform_submissions.couponCode',
+            'simpleform_submissions.discountAmount',
+            'simpleform_submissions.quizScore',
+            'simpleform_submissions.quizMaxScore',
+            'simpleform_submissions.quizPercentage',
+            'simpleform_submissions.quizGrade',
+            'simpleform_submissions.attribution',
+            'simpleform_submissions.editTokenHash',
+            'simpleform_submissions.editTokenExpires',
+        ]);
+
+        if ($this->formId !== null) {
+            $this->query->whereParam('simpleform_submissions.formId', $this->formId);
+        }
+
+        if ($this->readStatus !== null) {
+            $this->query->whereParam('simpleform_submissions.readStatus', $this->readStatus);
+        }
+
+        if ($this->workflowStatus !== null) {
+            $this->query->whereParam('simpleform_submissions.workflowStatus', $this->workflowStatus);
+        }
+
+        if ($this->userId !== null) {
+            $this->query->whereParam('simpleform_submissions.userId', $this->userId);
+        }
+
+        if ($this->paymentStatus !== null) {
+            $this->query->whereParam('simpleform_submissions.paymentStatus', $this->paymentStatus);
+        }
+
+        if ($this->orderId !== null) {
+            $this->query->whereParam('simpleform_submissions.orderId', $this->orderId);
+        }
     }
 }

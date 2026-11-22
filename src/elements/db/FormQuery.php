@@ -16,6 +16,15 @@ use craft\helpers\Db;
  */
 class FormQuery extends ElementQuery
 {
+    /**
+     * Declaring this real class-level property (not assigning it at
+     * runtime) is what makes Craft 6 auto-join this table — it replaces
+     * joinElementTable(), which beforePrepare() below still calls for
+     * Craft 5. Craft 5's own ElementQuery has no such property, so this
+     * is just an unused extra property there.
+     */
+    protected string $table = 'simpleform_forms';
+
     public ?string $handle = null;
     public ?string $name = null;
 
@@ -103,6 +112,70 @@ class FormQuery extends ElementQuery
         }
 
         return parent::beforePrepare();
+    }
+
+    /**
+     * Craft 6 never calls beforePrepare() at all — this is the real hook
+     * there. Translates the same joins/select/filters above to the new
+     * Illuminate\Database\Query\Builder ($this->query is no longer split
+     * into query/subQuery, and has no andWhere()/joinElementTable()).
+     */
+    protected function elementQueryBeforeQuery(): void
+    {
+        parent::elementQueryBeforeQuery();
+
+        $joinSiteId = $this->resolveJoinSiteId();
+        $this->query->leftJoin('simpleform_forms_sites', function($join) use ($joinSiteId) {
+            $join->on('simpleform_forms_sites.formId', '=', 'simpleform_forms.id')
+                ->where('simpleform_forms_sites.siteId', '=', $joinSiteId);
+        });
+
+        $this->query->addSelect([
+            'simpleform_forms.name',
+            'simpleform_forms.handle',
+            'simpleform_forms.propagationMethod',
+            'simpleform_forms.allowSaveResume',
+            'simpleform_forms.postSubmitAction',
+            'simpleform_forms.redirectEntryId',
+            'simpleform_forms.openDate',
+            'simpleform_forms.closeDate',
+            'simpleform_forms.submissionLimit',
+            'simpleform_forms.requireLogin',
+            'simpleform_forms.submissionsPerUser',
+            'simpleform_forms.guestLimitKey',
+            'simpleform_forms.templatePath',
+            'simpleform_forms.useCustomTemplate',
+            'simpleform_forms.preventDuplicates',
+            'simpleform_forms.duplicateWindowMinutes',
+            'simpleform_forms.duplicateKey',
+            'simpleform_forms.allowEditing',
+            'simpleform_forms.editWindowMinutes',
+            'simpleform_forms.quizMode',
+            'simpleform_forms.quizGradeBands',
+            'simpleform_forms.autoCaptureAttribution',
+            'simpleform_forms.capturePartials',
+            'simpleform_forms.renderMode',
+            'simpleform_forms.prefillFromQuery',
+            'simpleform_forms_sites.description',
+            'simpleform_forms_sites.emailTo',
+            'simpleform_forms_sites.emailSubject',
+            'simpleform_forms_sites.emailReplyTo',
+            'simpleform_forms_sites.emailBody',
+            'simpleform_forms_sites.submitMessage',
+            'simpleform_forms_sites.errorMessage',
+            'simpleform_forms_sites.redirectUrl',
+            'simpleform_forms_sites.closedMessage',
+            'simpleform_forms_sites.loginRequiredMessage',
+            'simpleform_forms_sites.userLimitMessage',
+        ]);
+
+        if ($this->handle !== null) {
+            $this->query->whereParam('simpleform_forms.handle', $this->handle);
+        }
+
+        if ($this->name !== null) {
+            $this->query->whereParam('simpleform_forms.name', $this->name);
+        }
     }
 
     /**
