@@ -3,6 +3,7 @@
 namespace anvildev\simpleform\tests\unit;
 
 use anvildev\simpleform\helpers\SubmissionCsv;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -27,9 +28,7 @@ class SubmissionCsvTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider dangerousCells
-     */
+    #[DataProvider('dangerousCells')]
     public function testDangerousCellsArePrefixed(string $input, string $expected): void
     {
         $this->assertSame($expected, SubmissionCsv::neutralizeFormula($input));
@@ -49,9 +48,7 @@ class SubmissionCsvTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider safeCells
-     */
+    #[DataProvider('safeCells')]
     public function testSafeCellsAreUnchanged(string $input): void
     {
         $this->assertSame($input, SubmissionCsv::neutralizeFormula($input));

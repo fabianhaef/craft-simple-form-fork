@@ -9,6 +9,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /** A Webhook connector whose HTTP client is a Guzzle mock. */
@@ -79,8 +80,8 @@ class WebhookIntegrationTest extends TestCase
      * path before any HTTP call is made. The mock has no queued response, so a
      * request reaching the client would throw — proving the guard short-circuits.
      *
-     * @dataProvider blockedUrlProvider
      */
+    #[DataProvider('blockedUrlProvider')]
     public function testSsrfBlockedUrlIsRejectedWithoutCall(string $url): void
     {
         $webhook = new MockWebhookIntegration(new MockHandler([])); // no responses queued

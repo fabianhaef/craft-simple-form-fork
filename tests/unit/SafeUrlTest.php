@@ -3,6 +3,7 @@
 namespace anvildev\simpleform\tests\unit;
 
 use anvildev\simpleform\helpers\SafeUrl;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -41,9 +42,7 @@ class SafeUrlTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider blockedUrls
-     */
+    #[DataProvider('blockedUrls')]
     public function testBlockedUrlsAreRejected(string $url): void
     {
         $this->assertFalse(SafeUrl::isPublicHttpUrl($url), "$url should be blocked");
@@ -65,9 +64,7 @@ class SafeUrlTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider allowedUrls
-     */
+    #[DataProvider('allowedUrls')]
     public function testPublicUrlsAreAllowed(string $url): void
     {
         $this->assertTrue(SafeUrl::isPublicHttpUrl($url), "$url should be allowed");
@@ -92,9 +89,7 @@ class SafeUrlTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider blockedRedirectUrls
-     */
+    #[DataProvider('blockedRedirectUrls')]
     public function testBlockedRedirectUrlsAreRejected(string $url, ?string $siteHost): void
     {
         $this->assertFalse(SafeUrl::isSafeRedirectUrl($url, $siteHost));
@@ -111,9 +106,7 @@ class SafeUrlTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider allowedRedirectUrls
-     */
+    #[DataProvider('allowedRedirectUrls')]
     public function testAllowedRedirectUrls(string $url, ?string $siteHost): void
     {
         $this->assertTrue(SafeUrl::isSafeRedirectUrl($url, $siteHost));
@@ -143,9 +136,8 @@ class SafeUrlTest extends TestCase
      * model that records `addError`. The acceptance branch never reaches
      * `Craft::t`, so no Craft bootstrap is needed here; the rejection/translation
      * path is covered end-to-end in the integration suite.
-     *
-     * @dataProvider acceptableSettingUrls
      */
+    #[DataProvider('acceptableSettingUrls')]
     public function testSettingUrlRuleAcceptsValidUrl(string $value): void
     {
         $errors = $this->runSettingRule($value);

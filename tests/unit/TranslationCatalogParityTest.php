@@ -2,6 +2,7 @@
 
 namespace anvildev\simpleform\tests\unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -131,9 +132,7 @@ class TranslationCatalogParityTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider localeProvider
-     */
+    #[DataProvider('localeProvider')]
     public function testLocaleHasExactlyTheEnglishKeys(string $locale): void
     {
         $en = array_keys($this->catalog('en'));
@@ -146,9 +145,7 @@ class TranslationCatalogParityTest extends TestCase
         $this->assertSame([], array_values($orphaned), "Locale '$locale' has orphaned keys: " . implode(' | ', $orphaned));
     }
 
-    /**
-     * @dataProvider localeProvider
-     */
+    #[DataProvider('localeProvider')]
     public function testLocaleValuesAreNonEmpty(string $locale): void
     {
         foreach ($this->catalog($locale) as $key => $value) {
@@ -157,9 +154,7 @@ class TranslationCatalogParityTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider localeProvider
-     */
+    #[DataProvider('localeProvider')]
     public function testLocaleActuallyTranslatesMostStrings(string $locale): void
     {
         $en = $this->catalog('en');

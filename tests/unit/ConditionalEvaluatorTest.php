@@ -3,6 +3,7 @@
 namespace anvildev\simpleform\tests\unit;
 
 use anvildev\simpleform\helpers\ConditionalEvaluator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -90,9 +91,7 @@ class ConditionalEvaluatorTest extends TestCase
 
     // --- operator matrix --------------------------------------------------
 
-    /**
-     * @dataProvider operatorProvider
-     */
+    #[DataProvider('operatorProvider')]
     public function testOperators(string $operator, mixed $actual, mixed $expected, bool $result): void
     {
         $this->assertSame($result, ConditionalEvaluator::compare($operator, $actual, $expected));

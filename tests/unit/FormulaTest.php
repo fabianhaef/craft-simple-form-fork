@@ -4,6 +4,7 @@ namespace anvildev\simpleform\tests\unit;
 
 use anvildev\simpleform\exceptions\FormulaException;
 use anvildev\simpleform\helpers\Formula;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -130,9 +131,7 @@ class FormulaTest extends TestCase
 
     // --- Injection / allow-list rejection --------------------------------
 
-    /**
-     * @dataProvider rejectProvider
-     */
+    #[DataProvider('rejectProvider')]
     public function testRejectsDisallowedInput(string $formula): void
     {
         $this->expectException(FormulaException::class);
