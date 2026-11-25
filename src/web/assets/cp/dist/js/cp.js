@@ -5,6 +5,17 @@
  * is guarded on the presence of its root element, so this single file is safe
  * to load on every CP screen. Dynamic values (action URLs, translated
  * messages) are read from data-* attributes set by the templates.
+ *
+ * Craft 6 marks these legacy Twig-rendered screens "Bridged" and loads their
+ * real content into the shell *after* this script already ran — and on at
+ * least one screen (`sf-integration-type`), replaces that content's DOM
+ * nodes again shortly after the first paint, discarding anything bound
+ * directly to them. So nothing here binds to a specific node up front:
+ * actions (click/change/submit) are wired once via delegation on `document`,
+ * reading data-* attributes fresh off the matched element at event time;
+ * one-time-per-node setup (initial visibility sync, Craft.ElevatedSessionForm
+ * instances) uses `onEachAppearance()`, which re-runs for a replacement node
+ * exactly like it would for a first-seen one.
  */
 (function () {
     'use strict';
@@ -12,42 +23,25 @@
     var csrf = window.Craft && Craft.csrfTokenValue;
 
     /**
-     * Form editor tabs: honour an incoming `#pane` hash (e.g. arriving from the
-     * Notifications/Integrations screens, whose tab strip deep-links back here)
-     * by activating that tab. Craft.CP wires the in-page panes but selects the
-     * server-rendered default tab on load, so deep-links need a nudge. Inert
-     * when there's no `#tabs` strip or the hash matches no tab.
+     * Runs `callback(el)` once for every element currently matching
+     * `selector`, and again for every later-appearing one — including a
+     * node that replaces an earlier match with the same id/selector. Each
+     * node is only ever passed to `callback` once.
+     *
+     * @param {string} selector
+     * @param {function(Element): void} callback
      */
-    function activateHashTab(attempt) {
-        var hash = window.location.hash;
-        if (!hash || hash.charAt(0) !== '#') {
-            return;
+    function onEachAppearance(selector, callback) {
+        var seen = new WeakSet();
+        function scan() {
+            document.querySelectorAll(selector).forEach(function (el) {
+                if (seen.has(el)) { return; }
+                seen.add(el);
+                callback(el);
+            });
         }
-        var tabs = document.getElementById('tabs');
-        if (!tabs) {
-            return;
-        }
-        var tab = tabs.querySelector('a[role="tab"][href="' + hash + '"]');
-        if (!tab || tab.classList.contains('sel')) {
-            return;
-        }
-        var cp = window.Craft && Craft.cp;
-        if (cp && cp.tabManager) {
-            cp.tabManager.selectTab(tab);
-            return;
-        }
-        // The tab manager isn't wired yet on first paint; retry briefly, then
-        // fall back to a native click (which Craft.Tabs also listens for).
-        if ((attempt || 0) < 20) {
-            setTimeout(function () { activateHashTab((attempt || 0) + 1); }, 50);
-        } else {
-            tab.click();
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { activateHashTab(0); });
-    } else {
-        activateHashTab(0);
+        scan();
+        new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
     }
 
     /**
@@ -134,140 +128,135 @@
     window.SimpleFormCp = window.SimpleFormCp || {};
     window.SimpleFormCp.sfConfirm = sfConfirm;
 
+    /**
+     * Form editor tabs: honour an incoming `#pane` hash (e.g. arriving from the
+     * Notifications/Integrations screens, whose tab strip deep-links back here)
+     * by activating that tab. Craft.CP wires the in-page panes but selects the
+     * server-rendered default tab on load, so deep-links need a nudge. Inert
+     * when there's no `#pane` hash.
+     */
+    function activateHashTab(tabs, attempt) {
+        var hash = window.location.hash;
+        var tab = tabs.querySelector('a[role="tab"][href="' + hash + '"]');
+        if (!tab || tab.classList.contains('sel')) {
+            return;
+        }
+        var cp = window.Craft && Craft.cp;
+        if (cp && cp.tabManager) {
+            cp.tabManager.selectTab(tab);
+            return;
+        }
+        // The tab manager isn't wired yet on first paint; retry briefly, then
+        // fall back to a native click (which Craft.Tabs also listens for).
+        if ((attempt || 0) < 20) {
+            setTimeout(function () { activateHashTab(tabs, (attempt || 0) + 1); }, 50);
+        } else {
+            tab.click();
+        }
+    }
+    (function () {
+        var hash = window.location.hash;
+        if (!hash || hash.charAt(0) !== '#') {
+            return;
+        }
+        onEachAppearance('#tabs', function (tabs) { activateHashTab(tabs, 0); });
+    })();
+
     // Any form opting into confirmation defers submit until the user agrees.
-    document.querySelectorAll('form[data-sf-confirm]').forEach(function (form) {
-        var armed = false;
-        form.addEventListener('submit', function (e) {
-            if (armed) { return; }
-            e.preventDefault();
-            sfConfirm(form.dataset.sfConfirm).then(function (ok) {
-                if (ok) { armed = true; form.submit(); }
-            });
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-sf-confirm') || form.__sfConfirmArmed) {
+            return;
+        }
+        e.preventDefault();
+        sfConfirm(form.dataset.sfConfirm).then(function (ok) {
+            if (ok) { form.__sfConfirmArmed = true; form.submit(); }
         });
     });
 
     // --- Submission detail: toggle read status ---
-    var toggleBtn = document.getElementById('toggle-status-btn');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', function () {
-            var msg = { generic: toggleBtn.dataset.error, network: toggleBtn.dataset.error };
-            postJson(
-                toggleBtn.dataset.action,
-                'submissionId=' + toggleBtn.dataset.submissionId,
-                function () { location.reload(); },
-                msg,
-            );
-        });
-    }
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#toggle-status-btn');
+        if (!btn) { return; }
+        var msg = { generic: btn.dataset.error, network: btn.dataset.error };
+        postJson(
+            btn.dataset.action,
+            'submissionId=' + btn.dataset.submissionId,
+            function () { location.reload(); },
+            msg,
+        );
+    });
 
-    // --- Integrations index: enable toggle + delete ---
-    var integrations = document.getElementById('sf-integrations');
-    if (integrations) {
-        var msgs = {
-            generic: integrations.dataset.error,
-            network: integrations.dataset.networkError,
-        };
-        integrations.querySelectorAll('.status-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                postJson(integrations.dataset.toggleUrl, 'integrationId=' + btn.dataset.id,
+    /**
+     * Shared by the Integrations/Notifications/Coupons index screens: a
+     * container with `data-toggle-url`/`data-delete-url`/`data-error`/
+     * `data-network-error`, each row's status toggled via `.status-toggle`
+     * and removed via `.delete[data-id]`.
+     *
+     * @param {string} containerId
+     * @param {string} idParam The POSTed id field name (e.g. `integrationId`).
+     */
+    function wireIndexToggleDelete(containerId, idParam) {
+        document.addEventListener('click', function (e) {
+            var container = e.target.closest('#' + containerId);
+            if (!container) { return; }
+            var msgs = { generic: container.dataset.error, network: container.dataset.networkError };
+
+            var toggleBtn = e.target.closest('.status-toggle');
+            if (toggleBtn && container.contains(toggleBtn)) {
+                postJson(container.dataset.toggleUrl, idParam + '=' + toggleBtn.dataset.id,
                     function () { location.reload(); }, msgs);
-            });
-        });
-        integrations.querySelectorAll('.delete[data-id]').forEach(function (el) {
-            el.addEventListener('click', function () {
-                sfConfirm(integrations.dataset.confirmDelete).then(function (ok) {
+                return;
+            }
+
+            var deleteBtn = e.target.closest('.delete[data-id]');
+            if (deleteBtn && container.contains(deleteBtn)) {
+                sfConfirm(container.dataset.confirmDelete).then(function (ok) {
                     if (!ok) { return; }
-                    postJson(integrations.dataset.deleteUrl, 'integrationId=' + el.dataset.id,
+                    postJson(container.dataset.deleteUrl, idParam + '=' + deleteBtn.dataset.id,
                         function () { location.reload(); }, msgs);
                 });
-            });
+            }
         });
     }
-
-    // --- Notifications index: enable toggle + delete (mirrors integrations) ---
-    var notifications = document.getElementById('sf-notifications');
-    if (notifications) {
-        var nMsgs = {
-            generic: notifications.dataset.error,
-            network: notifications.dataset.networkError,
-        };
-        notifications.querySelectorAll('.status-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                postJson(notifications.dataset.toggleUrl, 'notificationId=' + btn.dataset.id,
-                    function () { location.reload(); }, nMsgs);
-            });
-        });
-        notifications.querySelectorAll('.delete[data-id]').forEach(function (el) {
-            el.addEventListener('click', function () {
-                sfConfirm(notifications.dataset.confirmDelete).then(function (ok) {
-                    if (!ok) { return; }
-                    postJson(notifications.dataset.deleteUrl, 'notificationId=' + el.dataset.id,
-                        function () { location.reload(); }, nMsgs);
-                });
-            });
-        });
-    }
-
-    // --- Coupons index: enable toggle + delete (mirrors integrations) (#246) ---
-    var coupons = document.getElementById('sf-coupons');
-    if (coupons) {
-        var cMsgs = {
-            generic: coupons.dataset.error,
-            network: coupons.dataset.networkError,
-        };
-        coupons.querySelectorAll('.status-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                postJson(coupons.dataset.toggleUrl, 'couponId=' + btn.dataset.id,
-                    function () { location.reload(); }, cMsgs);
-            });
-        });
-        coupons.querySelectorAll('.delete[data-id]').forEach(function (el) {
-            el.addEventListener('click', function () {
-                sfConfirm(coupons.dataset.confirmDelete).then(function (ok) {
-                    if (!ok) { return; }
-                    postJson(coupons.dataset.deleteUrl, 'couponId=' + el.dataset.id,
-                        function () { location.reload(); }, cMsgs);
-                });
-            });
-        });
-    }
+    wireIndexToggleDelete('sf-integrations', 'integrationId');
+    wireIndexToggleDelete('sf-notifications', 'notificationId');
+    wireIndexToggleDelete('sf-coupons', 'couponId');
 
     // --- Per-form integrations: attach/detach a global integration to a form ---
-    var formIntegrations = document.getElementById('sf-form-integrations');
-    if (formIntegrations) {
-        var fiMsgs = {
-            generic: formIntegrations.dataset.error,
-            network: formIntegrations.dataset.networkError,
-        };
-        var fiFormId = formIntegrations.dataset.formId;
-        formIntegrations.querySelectorAll('.attach-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                postJson(formIntegrations.dataset.toggleUrl,
-                    'formId=' + fiFormId + '&integrationId=' + btn.dataset.id,
-                    function () { location.reload(); }, fiMsgs);
-            });
-        });
-    }
+    document.addEventListener('click', function (e) {
+        var container = e.target.closest('#sf-form-integrations');
+        var btn = e.target.closest('.attach-toggle');
+        if (!container || !btn || !container.contains(btn)) { return; }
+        var msgs = { generic: container.dataset.error, network: container.dataset.networkError };
+        postJson(container.dataset.toggleUrl,
+            'formId=' + container.dataset.formId + '&integrationId=' + btn.dataset.id,
+            function () { location.reload(); }, msgs);
+    });
 
     // --- Integration editor: pick a type from the dropdown, load its fields ---
-    var integrationType = document.getElementById('sf-integration-type');
-    if (integrationType && integrationType.dataset.newUrl) {
-        integrationType.addEventListener('change', function () {
-            if (!this.value) { return; }
-            // cpUrl() already carries a ?site= query, so merge the param rather
-            // than blindly appending a second '?'.
-            var url = new URL(integrationType.dataset.newUrl, window.location.origin);
-            url.searchParams.set('type', this.value);
-            window.location = url.toString();
-        });
-    }
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('#sf-integration-type');
+        if (!el || !el.dataset.newUrl || !el.value) { return; }
+        // cpUrl() already carries a ?site= query, so merge the param rather
+        // than blindly appending a second '?'.
+        var url = new URL(el.dataset.newUrl, window.location.origin);
+        url.searchParams.set('type', el.value);
+        window.location = url.toString();
+    });
 
     // --- Settings → Spam: conditional visibility of provider/type blocks ---
     // Craft's checkboxField renders a hidden input *and* the checkbox under the
     // same name; target the checkbox specifically.
-    var enableCaptcha = document.querySelector('input[type="checkbox"][name="enableCaptcha"]');
-    var captchaSettings = document.getElementById('captcha-settings');
-    var captchaType = document.getElementById('captchaType');
+    function syncCaptchaSettingsVisibility(checkbox) {
+        var settings = document.getElementById('captcha-settings');
+        if (settings) { settings.style.display = checkbox.checked ? 'block' : 'none'; }
+    }
+    onEachAppearance('input[type="checkbox"][name="enableCaptcha"]', syncCaptchaSettingsVisibility);
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('input[type="checkbox"][name="enableCaptcha"]');
+        if (el) { syncCaptchaSettingsVisibility(el); }
+    });
 
     function showCaptchaType(type) {
         document.querySelectorAll('.captcha-type-settings').forEach(function (el) {
@@ -276,23 +265,12 @@
         var typeEl = document.getElementById(type + '-settings');
         if (typeEl) { typeEl.style.display = 'block'; }
     }
+    onEachAppearance('#captchaType', function (captchaType) { showCaptchaType(captchaType.value); });
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('#captchaType');
+        if (el) { showCaptchaType(el.value); }
+    });
 
-    if (enableCaptcha && captchaSettings) {
-        function syncCaptchaSettingsVisibility() {
-            captchaSettings.style.display = enableCaptcha.checked ? 'block' : 'none';
-        }
-        syncCaptchaSettingsVisibility();
-        enableCaptcha.addEventListener('change', syncCaptchaSettingsVisibility);
-    }
-
-    if (captchaType) {
-        showCaptchaType(captchaType.value);
-        captchaType.addEventListener('change', function () {
-            showCaptchaType(this.value);
-        });
-    }
-
-    var providerSelect = document.getElementById('selectedCaptchaProvider');
     function showProvider(handle) {
         document.querySelectorAll('.captcha-provider-settings').forEach(function (el) {
             el.style.display = 'none';
@@ -300,71 +278,70 @@
         var el = document.getElementById(handle + '-provider-settings');
         if (el) { el.style.display = 'block'; }
     }
-    if (providerSelect) {
-        showProvider(providerSelect.value);
-        providerSelect.addEventListener('change', function () {
-            showProvider(this.value);
-        });
-    }
+    onEachAppearance('#selectedCaptchaProvider', function (providerSelect) { showProvider(providerSelect.value); });
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('#selectedCaptchaProvider');
+        if (el) { showProvider(el.value); }
+    });
 
-    var enableAkismet = document.querySelector('input[type="checkbox"][name="enableAkismet"]');
-    var akismetSettings = document.getElementById('akismet-settings');
-    if (enableAkismet && akismetSettings) {
-        function syncAkismetSettingsVisibility() {
-            akismetSettings.style.display = enableAkismet.checked ? 'block' : 'none';
-        }
-        syncAkismetSettingsVisibility();
-        enableAkismet.addEventListener('change', syncAkismetSettingsVisibility);
+    function syncAkismetSettingsVisibility(checkbox) {
+        var settings = document.getElementById('akismet-settings');
+        if (settings) { settings.style.display = checkbox.checked ? 'block' : 'none'; }
     }
+    onEachAppearance('input[type="checkbox"][name="enableAkismet"]', syncAkismetSettingsVisibility);
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('input[type="checkbox"][name="enableAkismet"]');
+        if (el) { syncAkismetSettingsVisibility(el); }
+    });
 
     // --- Forms index: open the import-a-form modal (#139) ---
-    var importBtn = document.getElementById('sf-import-btn');
-    var importModalEl = document.getElementById('sf-import-modal');
-    if (importBtn && importModalEl && window.Garnish) {
-        var importModal = null;
-        importBtn.addEventListener('click', function () {
-            if (!importModal) {
-                importModal = new Garnish.Modal($(importModalEl), { autoShow: false });
-                importModalEl.querySelectorAll('[data-sf-import-cancel]').forEach(function (btn) {
-                    btn.addEventListener('click', function () { importModal.hide(); });
-                });
-            }
-            importModal.show();
-        });
-    }
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#sf-import-btn');
+        if (!btn || !window.Garnish) { return; }
+        var importModalEl = document.getElementById('sf-import-modal');
+        if (!importModalEl) { return; }
+        if (!importModalEl.__sfModal) {
+            importModalEl.__sfModal = new Garnish.Modal($(importModalEl), { autoShow: false });
+            importModalEl.querySelectorAll('[data-sf-import-cancel]').forEach(function (cancelBtn) {
+                cancelBtn.addEventListener('click', function () { importModalEl.__sfModal.hide(); });
+            });
+        }
+        importModalEl.__sfModal.show();
+    });
 
     // #140: reveal the denylist textareas only when denylists are enabled.
-    var enableDenylists = document.querySelector('input[type="checkbox"][name="enableDenylists"]');
-    var denylistSettings = document.getElementById('denylist-settings');
-    if (enableDenylists && denylistSettings) {
-        function syncDenylistSettingsVisibility() {
-            denylistSettings.style.display = enableDenylists.checked ? 'block' : 'none';
-        }
-        syncDenylistSettingsVisibility();
-        enableDenylists.addEventListener('change', syncDenylistSettingsVisibility);
+    function syncDenylistSettingsVisibility(checkbox) {
+        var settings = document.getElementById('denylist-settings');
+        if (settings) { settings.style.display = checkbox.checked ? 'block' : 'none'; }
     }
+    onEachAppearance('input[type="checkbox"][name="enableDenylists"]', syncDenylistSettingsVisibility);
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('input[type="checkbox"][name="enableDenylists"]');
+        if (el) { syncDenylistSettingsVisibility(el); }
+    });
 
     // --- Notification editor: Recipient type toggles fixed-address vs. field ---
     // The fixed input and the field-select both post as `recipient`; only the
     // active one may be enabled so a single value is submitted.
-    var recipientType = document.getElementById('recipientType');
-    var recipientFixed = document.getElementById('sf-recipient-fixed');
-    var recipientField = document.getElementById('sf-recipient-field');
-    if (recipientType && recipientFixed && recipientField) {
-        function syncRecipientInputs() {
-            var isField = recipientType.value === 'field';
-            recipientFixed.classList.toggle('hidden', isField);
-            recipientField.classList.toggle('hidden', !isField);
-            recipientFixed.querySelectorAll('input, select').forEach(function (el) {
-                el.disabled = isField;
-            });
-            recipientField.querySelectorAll('input, select').forEach(function (el) {
-                el.disabled = !isField;
-            });
-        }
-        syncRecipientInputs();
-        recipientType.addEventListener('change', syncRecipientInputs);
+    function syncRecipientInputs(recipientType) {
+        var recipientFixed = document.getElementById('sf-recipient-fixed');
+        var recipientField = document.getElementById('sf-recipient-field');
+        if (!recipientFixed || !recipientField) { return; }
+        var isField = recipientType.value === 'field';
+        recipientFixed.classList.toggle('hidden', isField);
+        recipientField.classList.toggle('hidden', !isField);
+        recipientFixed.querySelectorAll('input, select').forEach(function (el) {
+            el.disabled = isField;
+        });
+        recipientField.querySelectorAll('input, select').forEach(function (el) {
+            el.disabled = !isField;
+        });
     }
+    onEachAppearance('#recipientType', syncRecipientInputs);
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('#recipientType');
+        if (el) { syncRecipientInputs(el); }
+    });
 
     // Elevated-session guard for sensitive settings forms: minting an MCP token
     // and saving the Spam Protection secrets require a re-verified password
@@ -374,14 +351,13 @@
     // the shared settings full-page form is flagged indirectly via a marker
     // (it renders `#main-form`, which the tab include can't annotate directly).
     if (window.Craft && Craft.ElevatedSessionForm) {
-        document.querySelectorAll('form[data-sf-elevated]').forEach(function (form) {
+        onEachAppearance('form[data-sf-elevated]', function (form) {
             new Craft.ElevatedSessionForm(form);
         });
-        if (document.querySelector('[data-sf-elevate-main-form]')) {
-            var mainForm = document.getElementById('main-form');
-            if (mainForm) {
+        onEachAppearance('#main-form', function (mainForm) {
+            if (document.querySelector('[data-sf-elevate-main-form]')) {
                 new Craft.ElevatedSessionForm(mainForm);
             }
-        }
+        });
     }
 })();
