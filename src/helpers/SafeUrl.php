@@ -221,7 +221,7 @@ final class SafeUrl
         $scheme = strtolower($parts['scheme']);
         $port = $parts['port'] ?? ($scheme === 'https' ? 443 : 80);
 
-        return ['curl' => [CURLOPT_RESOLVE => array_map(static fn(string $ip): string => "{$host}:{$port}:{$ip}", $ips)]];
+        return ['curl' => [CURLOPT_RESOLVE => [self::resolveOption($host, $port, $ips)]]];
     }
 
     /**
@@ -246,7 +246,26 @@ final class SafeUrl
         $scheme = strtolower($parts['scheme'] ?? 'https');
         $port = $parts['port'] ?? ($scheme === 'https' ? 443 : 80);
 
-        return ['curl' => [CURLOPT_RESOLVE => array_map(static fn(string $ip): string => "{$host}:{$port}:{$ip}", $ips)]];
+        return ['curl' => [CURLOPT_RESOLVE => [self::resolveOption($host, $port, $ips)]]];
+    }
+
+    /**
+     * Build a single `CURLOPT_RESOLVE` entry pinning `$host:$port` to every one
+     * of `$ips`, comma-separated. A *separate* `host:port:ip` string per IP
+     * (the original shape here) maps to the same host:port key for each one —
+     * curl keeps only the last entry added for a given host:port instead of
+     * trying each in turn, so mixing address families silently drops every IP
+     * but the last. That's a real failure mode, not a hypothetical: a host
+     * with both A and AAAA records on an IPv4-only runtime (common — AAAA
+     * records resolve over DNS regardless of whether the resolving host can
+     * actually route IPv6) pins to an unreachable IPv6 address and the
+     * request fails outright, even though the IPv4 address works fine. A
+     * single entry listing every IP lets curl fall through to the next one
+     * instead.
+     */
+    private static function resolveOption(string $host, int $port, array $ips): string
+    {
+        return "{$host}:{$port}:" . implode(',', $ips);
     }
 
     /**

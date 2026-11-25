@@ -5,6 +5,7 @@ namespace anvildev\simpleform\tests\unit;
 use anvildev\simpleform\helpers\SafeUrl;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 
 /**
  * SSRF guard (audit finding F3, CWE-918). Uses IP-literal and localhost hosts so
@@ -181,5 +182,35 @@ class SafeUrlTest extends TestCase
         \Closure::bind($validator, $model)('url', null, null, $value);
 
         return $model->flagged;
+    }
+
+    /**
+     * Regression for the real dispatch failures this caused in practice: a
+     * separate `CURLOPT_RESOLVE` entry per IP maps every one to the *same*
+     * `host:port` key, so curl keeps only the last one added instead of
+     * trying each in turn. On a host with both A and AAAA records, on an
+     * IPv4-only runtime (DNS resolves AAAA regardless of whether this host
+     * can route IPv6), that silently pins to the unreachable IPv6 address
+     * and the request fails outright — confirmed against a real target
+     * (`httpbin.org`) in this exact shape before the fix. The resolve list
+     * must instead collapse into one comma-separated entry per host:port,
+     * which lets curl fall through to the next address.
+     */
+    public function testResolveOptionCombinesMultipleIpsIntoOneEntry(): void
+    {
+        $method = new ReflectionMethod(SafeUrl::class, 'resolveOption');
+
+        $result = $method->invoke(null, 'example.com', 443, ['1.2.3.4', '2600:1f18::1', '5.6.7.8']);
+
+        $this->assertSame('example.com:443:1.2.3.4,2600:1f18::1,5.6.7.8', $result);
+    }
+
+    public function testResolveOptionWithASingleIp(): void
+    {
+        $method = new ReflectionMethod(SafeUrl::class, 'resolveOption');
+
+        $result = $method->invoke(null, 'example.com', 443, ['1.2.3.4']);
+
+        $this->assertSame('example.com:443:1.2.3.4', $result);
     }
 }
